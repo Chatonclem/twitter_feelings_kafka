@@ -5,9 +5,15 @@ import eu.nyuu.courses.serdes.SerdeFactory;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.errors.InvalidStateStoreException;
+import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.state.KeyValueIterator;
+import org.apache.kafka.streams.state.QueryableStoreTypes;
+import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +43,8 @@ public class Main {
         // Here you go :)
 
         final KStream<String, SensorEvent> sensorsStream = builder
-                .stream("sensors", null);
+                .stream("tweets", Consumed.with(Serdes.String(), sensorEventSerde))
+                .peek();
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), streamsConfiguration);
 
