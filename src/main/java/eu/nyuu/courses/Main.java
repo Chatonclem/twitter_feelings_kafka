@@ -18,6 +18,7 @@ import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.*;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -55,8 +56,9 @@ public class Main {
                 .stream("tweets", Consumed.with(Serdes.String(), sensorEventSerde))
                 .map((key, tweet) -> KeyValue.pair(tweet.getId(), new TweetSentiment(tweet.getNick(), tweet.getTimestamp(), tweet.getBody(), new Sentence(tweet.getBody()).sentiment().toString())));
 
-        KTable<String, Sentiment> user_table = stream_principal
+        KTable<Windowed<String>, Sentiment> user_table = stream_principal
                 .groupBy((k, v) -> v.getUser(), Grouped.with(stringSerde, sensorTweetSentiment))
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)))
                 .aggregate(
                         () -> new Sentiment(0,0,0),
                         (aggKey, newValue, aggValue) -> {
@@ -68,17 +70,18 @@ public class Main {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
                             }
                         },
-                        Materialized.<String, Sentiment, KeyValueStore< Bytes, byte[]>>
-                                as("tardicery_user_sentiment")
+                        Materialized.<String, Sentiment, WindowStore<Bytes, byte[]>>
+                                as("app_tardicery_user_sentiment")
                                 .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
                 );
 
-        KTable<String, Sentiment>  count_sentiment = stream_principal
+        KTable< Windowed<String>, Sentiment>  count_sentiment = stream_principal
                 .groupBy((k,v) -> "KEY", Grouped.with(stringSerde, sensorTweetSentiment))
+                .windowedBy(TimeWindows.of(Duration.ofMinutes(5)))
                 .aggregate(
                         () -> new Sentiment(0,0,0),
                         (aggKey, newValue, aggValue) -> {
-                            if (newValue.getSentiment() == "POSITIVE") {
+                            if (newValue.getSentiment().equals("POSITIVE") || newValue.getSentiment().equals("VERY POSITIVE")) {
                                 return new Sentiment(aggValue.getPositive() +1, aggValue.getNeutral(), aggValue.getNegative());
                             } else if (newValue.getSentiment() == "NEUTRAL") {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral() + 1, aggValue.getNegative());
@@ -86,12 +89,14 @@ public class Main {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
                             }
                         },
-                        Materialized.<String, Sentiment, KeyValueStore< Bytes, byte[]>>
-                                as("tardicery_global_sentiment")
+                        Materialized.<String, Sentiment, WindowStore<Bytes, byte[]>>
+                                as("app_tardicery_global_sentiment")
                                 .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
                 );
 
         count_sentiment.toStream().print(Printed.toSysOut());
+
+
         final KafkaStreams streams = new KafkaStreams(builder.build(), streamsConfiguration);
 
         streams.cleanUp();
