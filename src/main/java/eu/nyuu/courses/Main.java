@@ -51,9 +51,9 @@ public class Main {
         builder
                 .stream("tweets", Consumed.with(Serdes.String(), sensorEventSerde))
                 .map((key,tweet) -> KeyValue.pair(tweet.getId(), new TweetSentiment(tweet.getNick(), tweet.getTimestamp(), tweet.getBody(), new Sentence(tweet.getBody()).sentiment().toString())))
-                .to("tardicery_analyzed_tweets", Produced.with(Serdes.String(), sensorTweetSentiment));
+                .to("tardicery_2", Produced.with(Serdes.String(), sensorTweetSentiment));
 
-        KTable<String, Sentiment> group_stream = builder
+        KTable<String, Sentiment> user_table = builder
                 .stream("tardicery_2", Consumed.with(
                         Serdes.String(),
                         sensorTweetSentiment))
@@ -71,6 +71,28 @@ public class Main {
                         },
                         Materialized.<String, Sentiment, KeyValueStore< Bytes, byte[]>>
                                 as("tardicery_user_sentiment")
+                                .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
+                );
+
+        KTable<String, Sentiment>  count_sentiment = builder
+                .stream("tardicery_2", Consumed.with(
+                        Serdes.String(),
+                        sensorTweetSentiment
+                ))
+                .groupBy((k,v) -> "KEY")
+                .aggregate(
+                        () -> new Sentiment(0,0,0),
+                        (aggKey, newValue, aggValue) -> {
+                            if (newValue.getSentiment() == "POSITIVE") {
+                                return new Sentiment(aggValue.getPositive() +1, aggValue.getNeutral(), aggValue.getNegative());
+                            } else if (newValue.getSentiment() == "NEUTRAL") {
+                                return new Sentiment(aggValue.getPositive(), aggValue.getNeutral() + 1, aggValue.getNegative());
+                            } else {
+                                return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
+                            }
+                        },
+                        Materialized.<String, Sentiment, KeyValueStore< Bytes, byte[]>>
+                                as("tardicery_global_sentiment")
                                 .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
                 );
 
