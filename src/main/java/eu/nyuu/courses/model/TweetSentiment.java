@@ -10,22 +10,24 @@ public class TweetSentiment {
         private String body;
         private String sentiment;
 
-    public TweetSentiment(String user, String timestamp, String body, String sentiment) {
-        this.user = user;
-        this.timestamp = timestamp;
-        this.body = body;
-        this.sentiment = sentiment;
-    }
+        public TweetSentiment(){}
 
-    public String getUser() { return user;}
+        public TweetSentiment(String user, String timestamp, String body, String sentiment) {
+            this.user = user;
+            this.timestamp = timestamp;
+            this.body = body;
+            this.sentiment = sentiment;
+        }
 
-    public String getTimestamp() { return timestamp;}
+        public String getUser() { return user;}
 
-    public String getBody() {
-        return body;
-    }
+        public String getTimestamp() { return timestamp;}
 
-    public String getSentiment() {
-        return sentiment;
-    }
+        public String getBody() {
+            return body;
+        }
+
+        public String getSentiment() {
+            return sentiment;
+        }
 }

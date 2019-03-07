@@ -35,4 +35,11 @@ public class Sentiment {
         this.neutral = neutral;
         this.negative = negative;
     }
+
+    public Sentiment() {}
+
+    @Override
+    public String toString() {
+        return String.format("Positifs : %s , Neutres : %s, Negatifs : %s", this.positive, this.neutral, this.negative);
+    }
 }
