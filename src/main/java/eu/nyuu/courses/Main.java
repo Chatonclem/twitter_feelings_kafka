@@ -2,22 +2,19 @@ package eu.nyuu.courses;
 
 import edu.stanford.nlp.simple.*;
 import eu.nyuu.courses.model.SensorEvent;
+import eu.nyuu.courses.model.Sentiment;
 import eu.nyuu.courses.model.TweetSentiment;
 import eu.nyuu.courses.serdes.SerdeFactory;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KGroupedStream;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
-import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.state.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -45,6 +42,7 @@ public class Main {
         final Map<String, Object> serdeProps = new HashMap<>();
         final Serde<SensorEvent> sensorEventSerde = SerdeFactory.createSerde(SensorEvent.class, serdeProps);
         final Serde<TweetSentiment> sensorTweetSentiment = SerdeFactory.createSerde(TweetSentiment.class, serdeProps);
+        final Serde<Sentiment> sensorSentiment = SerdeFactory.createSerde(Sentiment.class, serdeProps);
 
         // Stream
         final StreamsBuilder builder = new StreamsBuilder();
@@ -55,11 +53,27 @@ public class Main {
                 .map((key,tweet) -> KeyValue.pair(tweet.getId(), new TweetSentiment(tweet.getNick(), tweet.getTimestamp(), tweet.getBody(), new Sentence(tweet.getBody()).sentiment().toString())))
                 .to("tardicery_analyzed_tweets", Produced.with(Serdes.String(), sensorTweetSentiment));
 
-        KGroupedStream<String, TweetSentiment> group_stream = builder
+        KTable<String, Sentiment> group_stream = builder
                 .stream("tardicery_2", Consumed.with(
                         Serdes.String(),
                         sensorTweetSentiment))
-                .groupBy((k, v) -> v.getUser());
+                .groupBy((k, v) -> v.getUser())
+                .aggregate(
+                        () -> new Sentiment(0,0,0),
+                        (aggKey, newValue, aggValue) -> {
+                            if (newValue.getSentiment() == "POSITIVE") {
+                                return new Sentiment(aggValue.getPositive() +1, aggValue.getNeutral(), aggValue.getNegative());
+                            } else if (newValue.getSentiment() == "NEUTRAL") {
+                                return new Sentiment(aggValue.getPositive(), aggValue.getNeutral() + 1, aggValue.getNegative());
+                            } else {
+                                return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
+                            }
+                        },
+                        Materialized.<String, Sentiment, KeyValueStore< Bytes, byte[]>>
+                                as("tardicery_user_sentiment")
+                                .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
+                );
+
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), streamsConfiguration);
 

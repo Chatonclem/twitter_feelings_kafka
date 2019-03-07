@@ -6,6 +6,30 @@ public class Sentiment {
     private Integer neutral;
     private Integer negative;
 
+    public Integer getPositive() {
+        return positive;
+    }
+
+    public void setPositive(Integer positive) {
+        this.positive = positive;
+    }
+
+    public Integer getNeutral() {
+        return neutral;
+    }
+
+    public void setNeutral(Integer neutral) {
+        this.neutral = neutral;
+    }
+
+    public Integer getNegative() {
+        return negative;
+    }
+
+    public void setNegative(Integer negative) {
+        this.negative = negative;
+    }
+
     public Sentiment(Integer positive, Integer neutral, Integer negative) {
         this.positive = positive;
         this.neutral = neutral;
