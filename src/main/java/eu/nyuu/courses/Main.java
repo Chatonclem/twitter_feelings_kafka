@@ -12,6 +12,7 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.KGroupedStream;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueIterator;
@@ -29,7 +30,7 @@ public class Main {
         Sentence sent = new Sentence("Lucy is in the sky with diamonds.");
         SentimentClass sentiment = sent.sentiment();
         sentiment.toString();
-        final String bootstrapServers = args.length > 0 ? args[0] : "163.172.145.138:9092";
+        final String bootstrapServers = args.length > 0 ? args[0] : "51.15.90.153:9092";
         final Properties streamsConfiguration = new Properties();
 
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "twitter_app_tmp");
@@ -51,9 +52,14 @@ public class Main {
         // Here you go :)
         builder
                 .stream("tweets", Consumed.with(Serdes.String(), sensorEventSerde))
-                .map((key,tweet) -> KeyValue.pair(tweet.getId(), new TweetSentiment(tweet.getBody(), new Sentence(tweet.getBody()).sentiment().toString())))
+                .map((key,tweet) -> KeyValue.pair(tweet.getId(), new TweetSentiment(tweet.getNick(), tweet.getTimestamp(), tweet.getBody(), new Sentence(tweet.getBody()).sentiment().toString())))
                 .to("tardicery_analyzed_tweets", Produced.with(Serdes.String(), sensorTweetSentiment));
 
+        KGroupedStream<String, TweetSentiment> group_stream = builder
+                .stream("tardicery_2", Consumed.with(
+                        Serdes.String(),
+                        sensorTweetSentiment))
+                .groupBy((k, v) -> v.getUser());
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), streamsConfiguration);
 

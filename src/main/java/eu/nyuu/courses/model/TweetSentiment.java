@@ -5,13 +5,21 @@ package eu.nyuu.courses.model;
  */
 public class TweetSentiment {
 
+        private String user;
+        private String timestamp;
         private String body;
         private String sentiment;
 
-    public TweetSentiment(String body, String sentiment) {
+    public TweetSentiment(String user, String timestamp, String body, String sentiment) {
+        this.user = user;
+        this.timestamp = timestamp;
         this.body = body;
         this.sentiment = sentiment;
     }
+
+    public String getUser() { return user;}
+
+    public String getTimestamp() { return timestamp;}
 
     public String getBody() {
         return body;
