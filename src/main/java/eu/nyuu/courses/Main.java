@@ -22,6 +22,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Main {
 
@@ -62,16 +64,16 @@ public class Main {
                 .aggregate(
                         () -> new Sentiment(0,0,0),
                         (aggKey, newValue, aggValue) -> {
-                            if (newValue.getSentiment() == "POSITIVE") {
+                            if (newValue.getSentiment().equals("POSITIVE") || newValue.getSentiment().equals("VERY POSITIVE")) {
                                 return new Sentiment(aggValue.getPositive() +1, aggValue.getNeutral(), aggValue.getNegative());
-                            } else if (newValue.getSentiment() == "NEUTRAL") {
+                            } else if (newValue.getSentiment().equals("NEUTRAL")) {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral() + 1, aggValue.getNegative());
                             } else {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
                             }
                         },
                         Materialized.<String, Sentiment, WindowStore<Bytes, byte[]>>
-                                as("app_tardicery_user_sentiment")
+                                as("app2_tardicery_user_sentiment")
                                 .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
                 );
 
@@ -83,16 +85,31 @@ public class Main {
                         (aggKey, newValue, aggValue) -> {
                             if (newValue.getSentiment().equals("POSITIVE") || newValue.getSentiment().equals("VERY POSITIVE")) {
                                 return new Sentiment(aggValue.getPositive() +1, aggValue.getNeutral(), aggValue.getNegative());
-                            } else if (newValue.getSentiment() == "NEUTRAL") {
+                            } else if (newValue.getSentiment().equals("NEUTRAL")) {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral() + 1, aggValue.getNegative());
                             } else {
                                 return new Sentiment(aggValue.getPositive(), aggValue.getNeutral(), aggValue.getNegative() + 1);
                             }
                         },
                         Materialized.<String, Sentiment, WindowStore<Bytes, byte[]>>
-                                as("app_tardicery_global_sentiment")
+                                as("app2_tardicery_global_sentiment")
                                 .withKeySerde(stringSerde).withValueSerde(sensorSentiment)
                 );
+
+
+        // Hashtags handling
+
+        final Pattern p = Pattern.compile("\\B(\\#[a-zA-Z]+\\b)(?!;)");
+
+        KTable<Windowed<String>, Integer> count_pop_hashtags = stream_principal
+                .groupBy((k,v) -> {
+                    Matcher m = p.matcher(v.getBody());
+                    if (m.find()) {
+
+                        m.group(0);
+                    }
+                }, Grouped.with(stringSerde, Integer))
+                .
 
         count_sentiment.toStream().print(Printed.toSysOut());
 
