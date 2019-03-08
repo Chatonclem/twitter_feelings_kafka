@@ -19,6 +19,7 @@ import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.*;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -29,14 +30,11 @@ public class Main {
 
     public static void main(final String[] args) {
 
-        Sentence sent = new Sentence("Lucy is in the sky with diamonds.");
-        SentimentClass sentiment = sent.sentiment();
-        sentiment.toString();
         final String bootstrapServers = args.length > 0 ? args[0] : "51.15.90.153:9092";
         final Properties streamsConfiguration = new Properties();
-        String topic = "tardicery_3";
-        streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "tardicery_twitter_app");
-        streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, "tardicery_twitter_app");
+        streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "tardicery3_twitter_app");
+        streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, "tardicery3_twitter_app");
+        streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "C:\\Users\\Adrian\\Projects\\tmp");
         // Where to find Kafka broker(s).
         streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         // Specify default (de)serializers for record keys and for record values.
@@ -98,7 +96,7 @@ public class Main {
 
 
         // Hashtags handling
-
+/*
         final Pattern p = Pattern.compile("\\B(\\#[a-zA-Z]+\\b)(?!;)");
 
         KTable<Windowed<String>, Integer> count_pop_hashtags = stream_principal
@@ -110,7 +108,7 @@ public class Main {
                     }
                 }, Grouped.with(stringSerde, Integer))
                 .
-
+*/
         count_sentiment.toStream().print(Printed.toSysOut());
 
 
@@ -121,5 +119,43 @@ public class Main {
 
         // Add shutdown hook to respond to SIGTERM and gracefully close Kafka Streams
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+
+        //Interactive Query
+
+        try {
+            Thread.sleep(Duration.ofMinutes(1).toMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        while (true) {
+            if (streams.state() == KafkaStreams.State.RUNNING) {
+                // Querying our local store
+                ReadOnlyWindowStore<String, Sentiment> windowStore =
+                        streams.store("app2_tardicery_global_sentiment", QueryableStoreTypes.windowStore());
+
+                // fetching all values for the last minute in the window
+                Instant now = Instant.now();
+                Instant lastMinute = now.minus(Duration.ofHours(1));
+
+                KeyValueIterator<Windowed<String>, Sentiment> iterator = windowStore.fetchAll(lastMinute, now);
+                while (iterator.hasNext()) {
+                    KeyValue<Windowed<String>, Sentiment> next = iterator.next();
+                    Windowed<String> windowTimestamp = next.key;
+                    System.out.println("Count of Positive " + windowTimestamp.key() + "@ " + windowTimestamp + " is " + next.value.getPositive());
+                    System.out.println("Count of Neutral " + windowTimestamp.key() + "@ " + windowTimestamp + " is " + next.value.getNeutral());
+                    System.out.println("Count of Negative " + windowTimestamp.key() + "@ " + windowTimestamp + " is " + next.value.getNegative());
+                }
+                // close the iterator to release resources
+                iterator.close();
+            }
+
+            // Dumping all keys every minute
+            try {
+                Thread.sleep(Duration.ofMinutes(1).toMillis());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 };
